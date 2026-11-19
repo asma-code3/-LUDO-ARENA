@@ -41,16 +41,17 @@ function mergeMessages(current, incoming) {
   return [...merged.values()].sort((left, right) => new Date(left.sentAt) - new Date(right.sentAt)).slice(-50)
 }
 
-function RoomPanel({ onlineMode, authenticated, room, error, joinCode, setJoinCode, createRoom, joinRoom, spectateRoom, startGame, userId, matchmaking, searching, cancelMatchmaking, spectator, onSignIn }) {
+function RoomPanel({ onlineMode, playerCount, authenticated, room, error, joinCode, setJoinCode, createRoom, joinRoom, spectateRoom, startGame, userId, matchmaking, searching, cancelMatchmaking, spectator, onSignIn }) {
   if (!onlineMode) return null
-  if (!authenticated) return <div className="online-room-bar"><div><b>Play online · 1 vs 1</b><small>Sign in to create a room, invite a friend, or find a player.</small></div><button className="button button-dark" onClick={onSignIn}>Sign in <span>→</span></button></div>
-  if (!room) return <div className="online-room-bar"><div><b>{searching ? 'Finding a player…' : 'Play online · 1 vs 1'}</b><small>{searching ? 'Waiting for one other player.' : 'Create a private room, watch a game, or find a random player.'}</small></div>{searching ? <button className="button button-soft" onClick={cancelMatchmaking}>Cancel</button> : <><button className="button button-dark" onClick={matchmaking}>Find player <span>↗</span></button><button className="button button-soft" onClick={createRoom}>Create room <span>＋</span></button><span className="room-or">ROOM CODE</span><input className="room-code-input" value={joinCode} onChange={(event) => setJoinCode(event.target.value.toUpperCase().slice(0, 6))} placeholder="6 CHARACTERS" aria-label="Room code"/><button className="button button-soft" disabled={joinCode.length !== 6} onClick={joinRoom}>Join</button><button className="button button-soft" disabled={joinCode.length !== 6} onClick={spectateRoom}>Watch</button></>}{error && <small className="room-error">{error}</small>}</div>
-  return <div className="online-room-bar"><div><b>{spectator ? 'Watching' : 'Room'} #{room.code}</b><small>{room.players.length} / 2 players · {room.status === 'playing' ? 'Game in progress' : 'Waiting for one more player'}</small></div><div className="room-players-mini">{room.players.map((player) => <span key={player.userId}>{player.username}{player.online ? ' · online' : ' · reconnecting'}</span>)}</div>{!spectator && room.status === 'waiting' && room.hostId === userId && <button className="button button-dark" disabled={room.players.length < 2} onClick={startGame}>Start game <span>→</span></button>}{error && <small className="room-error">{error}</small>}</div>
+  if (!authenticated) return <div className="online-room-bar"><div><b>Play online · {playerCount} players</b><small>Sign in to create a room, invite friends, or find players.</small></div><button className="button button-dark" onClick={onSignIn}>Sign in <span>→</span></button></div>
+  if (!room) return <div className="online-room-bar"><div><b>{searching ? `Finding ${playerCount === 2 ? 'a player' : 'two players'}…` : `Play online · ${playerCount} players`}</b><small>{searching ? `Waiting for ${playerCount - 1} other player${playerCount === 2 ? '' : 's'}.` : 'Create a private room, invite friends, or find a match.'}</small></div>{searching ? <button className="button button-soft" onClick={cancelMatchmaking}>Cancel</button> : <><button className="button button-dark" onClick={matchmaking}>Find players <span>↗</span></button><button className="button button-soft" onClick={createRoom}>Create room <span>＋</span></button><span className="room-or">ROOM CODE</span><input className="room-code-input" value={joinCode} onChange={(event) => setJoinCode(event.target.value.toUpperCase().slice(0, 6))} placeholder="6 CHARACTERS" aria-label="Room code"/><button className="button button-soft" disabled={joinCode.length !== 6} onClick={joinRoom}>Join</button><button className="button button-soft" disabled={joinCode.length !== 6} onClick={spectateRoom}>Watch</button></>}{error && <small className="room-error">{error}</small>}</div>
+  const playerLimit = room.playerLimit ?? playerCount
+  const waitingFor = playerLimit - room.players.length
+  return <div className="online-room-bar"><div><b>{spectator ? 'Watching' : 'Room'} #{room.code}</b><small>{room.players.length} / {playerLimit} players · {room.status === 'playing' ? 'Game in progress' : `Waiting for ${waitingFor} more player${waitingFor === 1 ? '' : 's'}`}</small></div><div className="room-players-mini">{room.players.map((player) => <span key={player.userId}>{player.username}{player.online ? ' · online' : ' · reconnecting'}</span>)}</div>{!spectator && room.status === 'waiting' && room.hostId === userId && <button className="button button-dark" disabled={room.players.length < playerLimit} onClick={startGame}>Start game <span>→</span></button>}{error && <small className="room-error">{error}</small>}</div>
 }
-
 function HomeZone({ player, color, index, turn, legalTokens, onMove }) {
   const zoneClass = ['home-red', 'home-green', 'home-yellow', 'home-blue'][index]
-  return <div className={`board-home ${zoneClass}`}><div className="home-inner">{Array.from({ length: 4 }, (_, tokenIndex) => {
+  return <div className={`board-home ${zoneClass} ${turn === index ? 'active-turn' : ''}`}><div className="home-inner">{Array.from({ length: 4 }, (_, tokenIndex) => {
     const progress = player?.tokens[tokenIndex]
     return progress === -1
       ? <motion.button layoutId={`token-${color}-${tokenIndex}`} transition={{ type: 'spring', stiffness: 420, damping: 34 }} key={tokenIndex} className={`yard-piece ${color} ${turn === index && legalTokens.includes(tokenIndex) ? 'token-available' : ''}`} disabled={!player || turn !== index || !legalTokens.includes(tokenIndex)} onClick={() => onMove(tokenIndex)} aria-label={`Move ${player?.name ?? color} token ${tokenIndex + 1}`}/>
@@ -62,8 +63,8 @@ function ChatPanel({ onlineMode, authenticated, room, messages, value, setValue,
   return <div className="game-chat"><div className="chat-title"><b>Room chat</b><span>● {onlineMode && authenticated ? room ? room.status === 'playing' ? 'Connected' : 'Room ready' : 'Connect to play' : 'Local room'}</span></div><div className="chat-messages">{messages.map((message) => <p key={message.id}><b>{message.player}</b> {message.emoji || message.text}</p>)}{messages.length === 0 && <p className="system-message">{onlineMode && authenticated ? 'Say hello to your room' : 'Local game · chat with your crew'}</p>}</div><div className="chat-reactions">{['👏', '😂', '🔥', '😮', '💚'].map((emoji) => <button key={emoji} onClick={() => onReact(emoji)} aria-label={`React ${emoji}`}>{emoji}</button>)}</div><form className="chat-input" onSubmit={onSend}><input value={value} onChange={(event) => setValue(event.target.value)} placeholder="Say something..." aria-label="Chat message" maxLength={280}/><button aria-label="Send message">↑</button></form></div>
 }
 
-export function GameRoom({ onExit, onSignIn, onProfileUpdate, user, onlineMode = false, token = null, userId, initialRoomCode = '', inviteFriendId = '' }) {
-  const [game, setGame] = useState(() => createGame({ playerNames: { coral: user?.username ?? 'Player 1', green: 'Player 2' }, playerColors: ['coral', 'green'] }))
+export function GameRoom({ onExit, onSignIn, onProfileUpdate, user, playerCount = 2, onlineMode = false, token = null, userId, initialRoomCode = '', inviteFriendId = '' }) {
+  const [game, setGame] = useState(() => createGame({ playerNames: { coral: user?.username ?? 'Player 1', green: 'Player 2', gold: 'Player 3' }, playerColors: colors.slice(0, playerCount) }))
   const [rolling, setRolling] = useState(false)
   const [soundsOn, setSoundsOn] = useState(() => localStorage.getItem('ludo-arena-sound') !== 'off')
   const [socket, setSocket] = useState(null)
@@ -84,6 +85,10 @@ export function GameRoom({ onExit, onSignIn, onProfileUpdate, user, onlineMode =
   const turn = game.currentPlayer
   const legalTokens = getLegalTokenIds(game)
   const currentName = game.players[turn]?.name ?? 'Player'
+  const playerLimit = room?.playerLimit ?? playerCount
+  const winnerName = game.players.find((player) => player.color === game.winner)?.name ?? null
+  const resultText = game.status === 'finished' ? winnerName ? `${winnerName} wins!` : 'No result' : 'No result yet'
+  const resultNote = game.status === 'finished' ? winnerName ? 'Match complete' : 'The match ended without a winner' : 'The match is still in progress'
   const myPlayerIndex = isOnline && room ? game.players.findIndex((player) => room.players.some((member) => member.color === player.color && member.userId === userId)) : 0
   const boardSeats = getBoardSeats(game.players)
 
@@ -139,21 +144,21 @@ export function GameRoom({ onExit, onSignIn, onProfileUpdate, user, onlineMode =
 
   useEffect(() => {
     if (!isOnline || !socket || !inviteFriendId || room || initialRoomCode) return
-    socket.emit('room:create', { mode: 'private' }, (created) => {
+    socket.emit('room:create', { mode: 'private', playerLimit }, (created) => {
       if (!created?.ok) { setRoomError(created?.error || 'Could not create a room.'); return }
       setRoom(created.room)
       socket.emit('room:invite', { code: created.room.code, recipientId: inviteFriendId }, (result) => {
         setInviteNotice(result?.ok ? 'Game invite sent.' : result?.error || 'Could not send the invite.')
       })
     })
-  }, [isOnline, socket, inviteFriendId, room, initialRoomCode])
+  }, [isOnline, socket, inviteFriendId, room, initialRoomCode, playerLimit])
 
-  const createRoom = () => socket?.emit('room:create', { mode: 'private' }, (result) => result?.ok ? (setSpectator(false), setRoom(result.room), setRoomError('')) : setRoomError(result?.error || 'Could not create a room.'))
+  const createRoom = () => socket?.emit('room:create', { mode: 'private', playerLimit }, (result) => result?.ok ? (setSpectator(false), setRoom(result.room), setRoomError('')) : setRoomError(result?.error || 'Could not create a room.'))
   const joinRoom = () => socket?.emit('room:join', { code: joinCode }, (result) => result?.ok ? (setSpectator(false), setRoom(result.room), setRoomError('')) : setRoomError(result?.error || 'Could not join that room.'))
   const spectateRoom = () => socket?.emit('room:spectate', { code: joinCode }, (result) => result?.ok ? (setRoom(result.room), setGame(result.game), setSpectator(true), setRoomError('')) : setRoomError(result?.error || 'Could not watch that game.'))
   const startGame = () => socket?.emit('game:start', { code: room?.code }, (result) => { if (!result?.ok) setRoomError(result?.error || 'Could not start the game.') })
   const inviteFriend = (friendId) => socket?.emit('room:invite', { code: room?.code, recipientId: friendId }, (result) => setInviteNotice(result?.ok ? 'Game invite sent.' : result?.error || 'Could not send the invite.'))
-  const findMatch = () => socket?.emit('matchmaking:join', { mode: 'online' }, (result) => { if (!result?.ok) setRoomError(result?.error || 'Could not find a match.'); else if (result.waiting) setSearching(true) })
+  const findMatch = () => socket?.emit('matchmaking:join', { mode: 'online', playerCount }, (result) => { if (!result?.ok) setRoomError(result?.error || 'Could not find a match.'); else if (result.waiting) setSearching(true) })
   const cancelMatchmaking = () => socket?.emit('matchmaking:leave', () => setSearching(false))
 
   const roll = () => {
@@ -195,13 +200,13 @@ export function GameRoom({ onExit, onSignIn, onProfileUpdate, user, onlineMode =
     else setMessages((current) => [...current.slice(-19), { id: `${Date.now()}-${Math.random()}`, player: 'Alex', emoji }])
   }
 
-  const heading = room ? `Room ${room.code}` : onlineMode ? 'Online 1 vs 1' : 'Offline 1 vs 1'
+  const heading = room ? `Room ${room.code}` : `${onlineMode ? 'Online' : 'Offline'} · ${playerCount} players`
   return <div className="game-page">
-    <div className="game-topline"><div><span className="eyebrow">{isOnline ? `REAL-TIME MULTIPLAYER · ${room ? `#${room.code}` : 'ROOM SETUP'}` : 'LOCAL TWO-PLAYER GAME'}</span><h1>{heading}</h1></div><button className="button button-soft" onClick={onExit}>← Back to arena</button></div>
-    <RoomPanel onlineMode={onlineMode} authenticated={authenticated} room={room} error={roomError} joinCode={joinCode} setJoinCode={setJoinCode} createRoom={createRoom} joinRoom={joinRoom} spectateRoom={spectateRoom} startGame={startGame} userId={userId} matchmaking={findMatch} searching={searching} cancelMatchmaking={cancelMatchmaking} spectator={spectator} onSignIn={onSignIn}/>
+    <div className="game-topline"><div><span className="eyebrow">{isOnline ? `REAL-TIME MULTIPLAYER · ${room ? `#${room.code}` : 'ROOM SETUP'}` : `LOCAL ${playerCount}-PLAYER GAME`}</span><h1>{heading}</h1></div><button className="button button-soft" onClick={onExit}>← Back to arena</button></div>
+    <RoomPanel onlineMode={onlineMode} playerCount={playerCount} authenticated={authenticated} room={room} error={roomError} joinCode={joinCode} setJoinCode={setJoinCode} createRoom={createRoom} joinRoom={joinRoom} spectateRoom={spectateRoom} startGame={startGame} userId={userId} matchmaking={findMatch} searching={searching} cancelMatchmaking={cancelMatchmaking} spectator={spectator} onSignIn={onSignIn}/>
     {isOnline && room?.status === 'waiting' && !spectator && <div className="online-room-bar"><div><b>Invite a friend</b><small>Invites expire after two hours and only accepted friends can join.</small></div><div className="room-invite-list">{roomFriends.filter((friend) => !room.players.some((player) => player.userId === friend._id)).map((friend) => <button className="button button-soft" key={friend._id} onClick={() => inviteFriend(friend._id)}>Invite {friend.username}</button>)}{roomFriends.length === 0 && <small>Add friends in your community page to invite them.</small>}</div>{inviteNotice && <small>{inviteNotice}</small>}</div>}
       <div className="game-layout"><div className="board-column">
-      <div className="game-player-strip">{game.players.map((player, index) => { const mine = index === myPlayerIndex; return <div key={player.color} className={`game-player ${turn === index ? 'active' : ''}`}><span className={`player-piece ${player.color}`}>{player.name[0]}</span><div><b>{player.name}{mine && isOnline ? ' (You)' : ''}</b><small>{turn === index ? mine ? 'Your turn' : 'Playing now' : 'In the game'}</small></div>{turn === index && <i className="turn-live"/>}</div>})}</div>
+      <div className={`game-player-strip players-${game.players.length}`}>{game.players.map((player, index) => { const mine = index === myPlayerIndex; return <div key={player.color} className={`game-player ${player.color} ${turn === index ? 'active' : ''}`}><span className={`player-piece ${player.color}`}>{player.name[0]}</span><div><b>{player.name}{mine && isOnline ? ' (You)' : ''}</b><small>{turn === index ? mine ? 'Your turn' : 'Playing now' : 'In the game'}</small></div>{turn === index && <i className="turn-live"/>}</div>})}</div>
       <div className={`ludo-board ${user?.boardTheme ?? 'board-classic'}`}><LayoutGroup id={`ludo-${room?.code ?? 'local'}`}>{boardSeats.map(({ color, index, player }) => <HomeZone key={color} player={player} color={color} index={index} turn={turn} legalTokens={legalTokens} onMove={move}/>)}<div className="path-track">
         {Object.entries(homeLanes).flatMap(([color, lane]) => lane.map(([row, col], index) => {
           const playerIndex = colors.indexOf(color)
@@ -216,8 +221,9 @@ export function GameRoom({ onExit, onSignIn, onProfileUpdate, user, onlineMode =
       </div></LayoutGroup></div>
       <ChatPanel onlineMode={onlineMode} authenticated={authenticated} room={room} messages={messages} value={chatValue} setValue={setChatValue} onSend={sendMessage} onReact={sendReaction}/>
     </div><aside className="game-control">
-      <div className="game-round"><span className="eyebrow">ROUND {String(game.turnNumber).padStart(2, '0')}</span><b>Classic 1 vs 1 Ludo</b><small>First player to bring all tokens home wins</small></div>
+      <div className="game-round"><span className="eyebrow">ROUND {String(game.turnNumber).padStart(2, '0')}</span><b>Classic {game.players.length}-player Ludo</b><small>First player to bring all tokens home wins</small></div>
       <div className="turn-card"><div className="turn-card-label">CURRENT TURN</div><div className="turn-player"><span className={`player-piece ${game.players[turn].color}`}>{currentName[0]}</span><div><b>{game.winner ? `${currentName} wins!` : currentName}</b><small>{isOnline ? turn === myPlayerIndex ? 'That’s you' : 'Opponent is playing' : `${currentName}'s turn`}</small></div></div></div>
+      <div className={`game-result ${game.status === 'finished' ? winnerName ? 'result-win' : 'result-none' : 'result-pending'}`} role="status"><span className="game-result-label">GAME RESULT</span><b>{resultText}</b><small>{resultNote}</small></div>
       <div className="dice-area"><button className={`large-die ${user?.diceSkin ?? 'dice-classic'} ${rolling ? 'shake' : ''}`} onClick={roll} aria-label="Roll dice" disabled={spectator || game.dice !== null || (isOnline && room?.status !== 'playing')}><span>{rolling ? '⚄' : game.dice ?? '⚄'}</span></button><small>{spectator?'Spectator mode':game.dice ? 'Choose a highlighted token' : isOnline && room?.status !== 'playing' ? 'Start the room to roll' : 'Tap to roll'}</small></div>
       <button className="button button-dark full-button" onClick={() => legalTokens.length === 1 ? move(legalTokens[0]) : roll()} disabled={spectator || game.status === 'finished' || (isOnline && room?.status !== 'playing')}>{spectator ? 'Watching' : game.dice && legalTokens.length === 1 ? 'Move token' : game.dice ? 'Choose a token' : isOnline ? `Roll ${turn === myPlayerIndex ? 'your' : 'the'} dice` : `Roll ${currentName}'s dice`} <span>→</span></button>
       <div className="game-control-divider"/><div className="room-tools"><button onClick={() => navigator.clipboard?.writeText(room?.code ?? '')}><span>♧</span> Copy room code <b>＋</b></button><button onClick={() => { const next = !soundsOn; setSoundsOn(next); localStorage.setItem('ludo-arena-sound', next ? 'on' : 'off') }} aria-pressed={soundsOn}><span>◖</span> Sound effects <b className={soundsOn ? 'toggle-on' : ''}>{soundsOn ? 'On' : 'Off'}</b></button><button><span>⚑</span> Report a problem <b>↗</b></button></div><VoiceChat room={room} socket={socket} userId={userId}/><div className="game-note"><span>✦</span><p>Have fun and play fair.<br/><b>Good luck, everyone!</b></p></div>

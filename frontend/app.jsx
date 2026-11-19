@@ -32,6 +32,7 @@ const libraryItems = [
 export default function App() {
   const [page, setPage] = useState('home')
   const [gameMode, setGameMode] = useState('choose')
+  const [playerCount, setPlayerCount] = useState(2)
   const [roomCode, setRoomCode] = useState('')
   const [inviteFriendId, setInviteFriendId] = useState('')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
@@ -74,6 +75,13 @@ export default function App() {
       if (action === 'accept') { setShowInvites(false); navigate('play', 'online', invite.roomCode) }
     } catch (error) { setInviteError(error.message) }
   }
+  const completeAuth = (result) => {
+    authToken.set(result.token)
+    setToken(result.token)
+    setProfile({ user: result.user })
+    setPage('home')
+  }
+  if (!token) return <AuthPage onSuccess={completeAuth} />
   return <div className="app-shell">
     <Navigation items={items} libraryItems={libraryItems} current={page} onNavigate={navigate} open={mobileNavOpen} onToggle={() => setMobileNavOpen((v) => !v)} user={profile?.user} authenticated={Boolean(token)} />
     <main className="main-content">
@@ -82,17 +90,19 @@ export default function App() {
         <div className="breadcrumb"><span>Arena</span><b>/</b><strong>{items.concat(libraryItems).find((item) => item.id === page)?.label ?? 'Profile'}</strong></div>
         <div className="topbar-actions">{token?<><div className="invite-inbox"><button className="icon-button notification" aria-label="Game invitations" aria-expanded={showInvites} onClick={()=>{setShowInvites((value)=>!value);setInviteError('')}}>♧<i />{invites.length>0&&<span className="invite-count">{invites.length}</span>}</button>{showInvites&&<div className="invite-popover"><b>Game invites</b>{inviteError&&<small className="room-error">{inviteError}</small>}{invites.map((invite)=><article key={invite._id}><span><strong>{invite.sender?.username ?? 'A player'}</strong> invited you to room {invite.roomCode}.</span><div><button onClick={()=>respondInvite(invite,'accept')}>Join</button><button className="quiet-button" onClick={()=>respondInvite(invite,'dismiss')}>Dismiss</button></div></article>)}{invites.length===0&&!inviteError&&<small>No pending invites.</small>}</div>}</div><button className="profile-button" onClick={() => navigate('profile')}><span className="profile-avatar">{profile?.user?.avatar === 'avatar-fox' ? '🦊' : profile?.user?.avatar === 'avatar-robot' ? '🤖' : (profile?.user?.username??'A')[0].toUpperCase()}</span><span className="profile-label"><b>{profile?.user?.username??'Player'}</b><small>Level {profile?.user?.level??1}</small></span><span className="chevron">⌄</span></button></>:<button className="button button-dark" onClick={()=>navigate('auth')}>Sign in <span>→</span></button>}</div>
       </header>
-      {page === 'auth' ? <AuthPage onBack={()=>navigate('home')} onSuccess={(result)=>{authToken.set(result.token);setToken(result.token);setProfile({user:result.user});navigate('home')}}/> : page === 'home' ? <Dashboard user={profile?.user} dashboard={profile} onProfileUpdate={setProfile} onNavigate={navigate} /> : page === 'play' ? gameMode === 'choose' ? <PlayModeSelector onSelect={(mode) => setGameMode(mode)} /> : <GameRoom user={profile?.user} onlineMode={gameMode === 'online'} token={token} userId={profile?.user?.id ?? profile?.user?._id} initialRoomCode={roomCode} inviteFriendId={inviteFriendId} onProfileUpdate={setProfile} onSignIn={()=>navigate('auth')} onExit={() => navigate('home')} /> : page === 'friends' ? <FriendsPage authenticated={Boolean(token)} onNavigate={navigate}/> : page === 'tournaments' ? <TournamentsPage authenticated={Boolean(token)} userId={profile?.user?.id ?? profile?.user?._id} onNavigate={navigate}/> : page === 'leaderboard' ? <LeaderboardPage authenticated={Boolean(token)} onNavigate={navigate}/> : page==='history'?<HistoryPage authenticated={Boolean(token)} userId={profile?.user?.id ?? profile?.user?._id} onNavigate={navigate}/>:page==='rewards'?<RewardsPage authenticated={Boolean(token)} user={profile?.user} onProfileUpdate={setProfile} onNavigate={navigate}/>:page==='shop'?<CustomizationPage authenticated={Boolean(token)} onProfileUpdate={setProfile} onNavigate={navigate}/>:page==='settings'?<SettingsPage authenticated={Boolean(token)} user={profile?.user} onProfileUpdate={setProfile} onNavigate={navigate}/>:<ProfilePage authenticated={Boolean(token)} user={profile?.user} onNavigate={navigate} onLogout={()=>{authToken.clear();setToken(null);setProfile(null);navigate('home')}}/>}
+      {page === 'auth' ? <AuthPage onBack={()=>navigate('home')} onSuccess={(result)=>{authToken.set(result.token);setToken(result.token);setProfile({user:result.user});navigate('home')}}/> : page === 'home' ? <Dashboard user={profile?.user} dashboard={profile} onProfileUpdate={setProfile} onNavigate={navigate} /> : page === 'play' ? gameMode === 'choose' ? <PlayModeSelector onSelect={(mode, count) => { setGameMode(mode); setPlayerCount(count) }} /> : <GameRoom user={profile?.user} playerCount={playerCount} onlineMode={gameMode === 'online'} token={token} userId={profile?.user?.id ?? profile?.user?._id} initialRoomCode={roomCode} inviteFriendId={inviteFriendId} onProfileUpdate={setProfile} onSignIn={()=>navigate('auth')} onExit={() => navigate('home')} /> : page === 'friends' ? <FriendsPage authenticated={Boolean(token)} onNavigate={navigate}/> : page === 'tournaments' ? <TournamentsPage authenticated={Boolean(token)} userId={profile?.user?.id ?? profile?.user?._id} onNavigate={navigate}/> : page === 'leaderboard' ? <LeaderboardPage authenticated={Boolean(token)} onNavigate={navigate}/> : page==='history'?<HistoryPage authenticated={Boolean(token)} userId={profile?.user?.id ?? profile?.user?._id} onNavigate={navigate}/>:page==='rewards'?<RewardsPage authenticated={Boolean(token)} user={profile?.user} onProfileUpdate={setProfile} onNavigate={navigate}/>:page==='shop'?<CustomizationPage authenticated={Boolean(token)} onNavigate={navigate}/>:page==='settings'?<SettingsPage authenticated={Boolean(token)} user={profile?.user} onProfileUpdate={setProfile} onNavigate={navigate}/>:<ProfilePage authenticated={Boolean(token)} user={profile?.user} onNavigate={navigate} onLogout={()=>{authToken.clear();setToken(null);setProfile(null);navigate('home')}}/>}
     </main>
   </div>
 }
 
 function PlayModeSelector({ onSelect }) {
   return <section className="simple-page section-block">
-    <SectionHeading eyebrow="TWO PLAYER LUDO" title="Choose how to play" />
+    <SectionHeading eyebrow="CHOOSE YOUR MATCH" title="Players and play mode" />
     <div className="mode-grid">
-      <button className="mode-card" onClick={() => onSelect('offline')}><span className="mode-icon mint">♟</span><span className="mode-tag">2 PLAYERS</span><b>Offline · 1 vs 1</b><small>Play together on one device</small><span className="mode-arrow">↗</span></button>
-      <button className="mode-card" onClick={() => onSelect('online')}><span className="mode-icon violet">◉</span><span className="mode-tag">2 PLAYERS</span><b>Online · 1 vs 1</b><small>Find a player or invite a friend</small><span className="mode-arrow">↗</span></button>
+      <button className="mode-card" onClick={() => onSelect('offline', 2)}><span className="mode-icon mint">♟</span><span className="mode-tag">2 PLAYERS</span><b>Offline · 2 players</b><small>Play together on one device</small><span className="mode-arrow">↗</span></button>
+      <button className="mode-card" onClick={() => onSelect('offline', 3)}><span className="mode-icon mint">♟</span><span className="mode-tag">3 PLAYERS</span><b>Offline · 3 players</b><small>Play together on one device</small><span className="mode-arrow">↗</span></button>
+      <button className="mode-card" onClick={() => onSelect('online', 2)}><span className="mode-icon violet">◉</span><span className="mode-tag">2 PLAYERS</span><b>Online · 2 players</b><small>Find a player or invite a friend</small><span className="mode-arrow">↗</span></button>
+      <button className="mode-card" onClick={() => onSelect('online', 3)}><span className="mode-icon violet">◉</span><span className="mode-tag">3 PLAYERS</span><b>Online · 3 players</b><small>Find two players or invite friends</small><span className="mode-arrow">↗</span></button>
     </div>
   </section>
 }

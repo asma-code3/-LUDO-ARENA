@@ -1,4 +1,4 @@
-const QUEUE_KEYS = ['arena:{ludo}:matchmaking:online', 'arena:{ludo}:matchmaking:team']
+const QUEUE_KEYS = ['arena:{ludo}:matchmaking:online', 'arena:{ludo}:matchmaking:team', 'arena:{ludo}:matchmaking:online-3']
 
 const JOIN_QUEUE_SCRIPT = `
 local userId = ARGV[1]
@@ -6,7 +6,8 @@ local socketId = ARGV[2]
 local username = ARGV[3]
 local mode = ARGV[4]
 local needed = tonumber(ARGV[5])
-local now = tonumber(ARGV[6])
+local playerCount = tonumber(ARGV[6])
+local now = tonumber(ARGV[7])
 local staleBefore = now - 45000
 for _, key in ipairs(KEYS) do
   local entries = redis.call('LRANGE', key, 0, -1)
@@ -17,7 +18,7 @@ for _, key in ipairs(KEYS) do
     end
   end
 end
-local target = mode == 'team' and KEYS[2] or KEYS[1]
+local target = mode == 'team' and KEYS[2] or (playerCount == 3 and KEYS[3] or KEYS[1])
 local candidates = redis.call('LRANGE', target, 0, needed - 1)
 if #candidates < needed then
   redis.call('RPUSH', target, cjson.encode({ userId = userId, socketId = socketId, username = username, mode = mode, enqueuedAt = now }))
@@ -55,7 +56,7 @@ for index = 2, #ARGV do
   end
   if not exists then
     item.enqueuedAt = now
-    local target = item.mode == 'team' and KEYS[2] or KEYS[1]
+    local target = item.mode == 'team' and KEYS[2] or (tonumber(item.playerCount) == 3 and KEYS[3] or KEYS[1])
     redis.call('RPUSH', target, cjson.encode(item))
     redis.call('EXPIRE', target, 600)
   end
@@ -63,8 +64,8 @@ end
 return 1
 `
 
-export async function joinSharedMatchmakingQueue(redis, { userId, socketId, username, mode, playersNeeded }) {
-  const result = await redis.eval(JOIN_QUEUE_SCRIPT, QUEUE_KEYS.length, ...QUEUE_KEYS, userId, socketId, username, mode, String(playersNeeded), String(Date.now()))
+export async function joinSharedMatchmakingQueue(redis, { userId, socketId, username, mode, playersNeeded, playerCount = 2 }) {
+  const result = await redis.eval(JOIN_QUEUE_SCRIPT, QUEUE_KEYS.length, ...QUEUE_KEYS, userId, socketId, username, mode, String(playersNeeded), String(playerCount), String(Date.now()))
   return { waiting: Number(result[0]) === 0, candidates: result.slice(1).map((entry) => JSON.parse(entry)) }
 }
 

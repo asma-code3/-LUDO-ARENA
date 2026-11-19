@@ -76,6 +76,7 @@ export async function attachGameSockets(httpServer, { redis = null, redisSub = n
       if (!allowSocketAction(socket, 'room:create', 5, 60_000)) return ack({ ok: false, error: 'Wait before creating another room.' })
       try {
         const code = makeCode()
+        const playerLimit = Number(payload.playerLimit) === 3 ? 3 : 2
         const room = {
           code,
           hostId: socket.user.id,
@@ -83,9 +84,10 @@ export async function attachGameSockets(httpServer, { redis = null, redisSub = n
           game: null,
           status: 'waiting',
           mode: 'private',
+          playerLimit,
         }
         rooms.set(code, room)
-        const record = await GameRoom.create({ code, host: socket.user.id, mode: room.mode, players: [{ user: socket.user.id, color: colors[0], ready: true }] })
+        const record = await GameRoom.create({ code, host: socket.user.id, mode: room.mode, playerLimit, players: [{ user: socket.user.id, color: colors[0], ready: true }] })
         room.documentId = record.id
         room.createdAt = record.createdAt
         socket.join(code)
@@ -108,7 +110,7 @@ export async function attachGameSockets(httpServer, { redis = null, redisSub = n
           }
           if (room.status !== 'waiting') return ack({ ok: false, error: 'Room not found or already started.' })
           if (room.mode === 'tournament') return ack({ ok: false, error: 'Only players in the bracket can join this room.' })
-          if (room.members.length >= 2) return ack({ ok: false, error: 'This room is full. Ludo rooms have two players.' })
+          if (room.members.length >= (room.playerLimit ?? 2)) return ack({ ok: false, error: `This room is full. It allows ${room.playerLimit ?? 2} players.` })
           const player = { userId: socket.user.id, username: socket.user.username, socketId: socket.id, color: colors[room.members.length] }
           room.members.push(player)
           socket.join(room.code)
@@ -129,8 +131,8 @@ export async function attachGameSockets(httpServer, { redis = null, redisSub = n
     socket.on('matchmaking:join', async (payload = {}, ack = () => {}) => {
       if (!allowSocketAction(socket, 'matchmaking', 3, 30_000)) return ack({ ok: false, error: 'Wait before searching for another match.' })
       const mode = 'online'
-      const requiredPlayers = 2
-      const currentPlayer = { userId: socket.user.id, username: socket.user.username, socketId: socket.id, mode, enqueuedAt: Date.now() }
+      const requiredPlayers = Number(payload.playerCount) === 3 ? 3 : 2
+      const currentPlayer = { userId: socket.user.id, username: socket.user.username, socketId: socket.id, mode, playerCount: requiredPlayers, enqueuedAt: Date.now() }
       let candidates = []
       if (redis) {
         const queued = await joinSharedMatchmakingQueue(redis, { ...currentPlayer, playersNeeded: requiredPlayers - 1 })
@@ -153,7 +155,7 @@ export async function attachGameSockets(httpServer, { redis = null, redisSub = n
         if (duplicate >= 0) matchmakingQueue.splice(duplicate, 1)
         for (let index = 0; index < matchmakingQueue.length && candidates.length < requiredPlayers - 1; index += 1) {
           const entry = matchmakingQueue[index]
-          if (entry.mode === mode && entry.userId !== socket.user.id && io.sockets.sockets.has(entry.socketId)) candidates.push({ index, entry })
+          if (entry.mode === mode && entry.playerCount === requiredPlayers && entry.userId !== socket.user.id && io.sockets.sockets.has(entry.socketId)) candidates.push({ index, entry })
         }
         if (candidates.length < requiredPlayers - 1) {
           matchmakingQueue.push(currentPlayer)
@@ -167,8 +169,8 @@ export async function attachGameSockets(httpServer, { redis = null, redisSub = n
         const code = makeCode()
         const members = players.map((member, index) => ({ ...member, color: colors[index] }))
         const game = createGame({ playerNames: Object.fromEntries(members.map((member) => [member.color, member.username])), playerColors: members.map((member) => member.color) })
-        const room = { code, hostId: members[0].userId, members, game, status: 'playing', mode, startedAt: new Date() }
-        const record = await GameRoom.create({ code, host: members[0].userId, mode, status: 'playing', startedAt: room.startedAt, players: members.map((member) => ({ user: member.userId, color: member.color, ready: true })), state: room.game })
+        const room = { code, hostId: members[0].userId, members, game, status: 'playing', mode, playerLimit: requiredPlayers, startedAt: new Date() }
+        const record = await GameRoom.create({ code, host: members[0].userId, mode, playerLimit: requiredPlayers, status: 'playing', startedAt: room.startedAt, players: members.map((member) => ({ user: member.userId, color: member.color, ready: true })), state: room.game })
         room.documentId = record.id
         room.createdAt = record.createdAt
         rooms.set(code, room)
@@ -197,7 +199,7 @@ export async function attachGameSockets(httpServer, { redis = null, redisSub = n
         await withRoomLock(redis, String(code ?? '').trim().toUpperCase(), async () => {
           const room = await loadRoom(code)
           if (!room || room.hostId !== socket.user.id) return ack({ ok: false, error: 'Only the room host can start the game.' })
-          const requiredPlayers = 2
+          const requiredPlayers = room.playerLimit ?? 2
           if (room.members.length !== requiredPlayers || room.status !== 'waiting') return ack({ ok: false, error: `This room needs exactly ${requiredPlayers} players to start.` })
           room.status = 'playing'
           room.startedAt = new Date()
@@ -273,7 +275,7 @@ export async function attachGameSockets(httpServer, { redis = null, redisSub = n
       if (!room.members.some((member) => member.userId === socket.user.id)) return ack({ ok: false, error: 'Join the room before inviting friends.' })
       const targetId = String(recipientId ?? '')
       if (!/^[a-f\d]{24}$/i.test(targetId) || targetId === socket.user.id || room.members.some((member) => member.userId === targetId)) return ack({ ok: false, error: 'Choose a friend who is not already in the room.' })
-      if (room.members.length >= 2) return ack({ ok: false, error: 'This room is full. Ludo rooms have two players.' })
+      if (room.members.length >= (room.playerLimit ?? 2)) return ack({ ok: false, error: `This room is full. It allows ${room.playerLimit ?? 2} players.` })
       try {
         const recipient = await User.findById(targetId).select('allowFriendInvites')
         if (!recipient || recipient.allowFriendInvites === false) return ack({ ok: false, error: 'This player is not accepting friend invites.' })
@@ -436,6 +438,7 @@ async function restoreRooms() {
       game: record.state,
       status: record.status,
       mode: record.mode,
+      playerLimit: record.playerLimit ?? 2,
       tournamentId: record.tournament ? String(record.tournament) : null,
       createdAt: record.createdAt,
       startedAt: record.startedAt,
@@ -465,6 +468,7 @@ async function loadRoom(code) {
     game: record.state,
     status: record.status,
     mode: record.mode,
+    playerLimit: record.playerLimit ?? 2,
     tournamentId: record.tournament ? String(record.tournament) : null,
     createdAt: record.createdAt,
     startedAt: record.startedAt,
@@ -509,7 +513,7 @@ async function saveGameResult(room) {
 }
 
 function publicRoom(room) {
-  return { code: room.code, status: room.status, mode: room.mode, hostId: room.hostId, players: room.members.map(({ userId, username, color, socketId, online }) => ({ userId, username, color, online: Boolean(socketId || online) })) }
+  return { code: room.code, status: room.status, mode: room.mode, playerLimit: room.playerLimit ?? 2, hostId: room.hostId, players: room.members.map(({ userId, username, color, socketId, online }) => ({ userId, username, color, online: Boolean(socketId || online) })) }
 }
 
 function safeMessage(error) {

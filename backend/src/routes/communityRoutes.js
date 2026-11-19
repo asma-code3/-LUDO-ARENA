@@ -49,8 +49,8 @@ router.patch('/invites/:inviteId', async (req, res, next) => {
     const invite = await GameInvite.findOne({ _id: req.params.inviteId, recipient: req.userId, status: 'pending', expiresAt: { $gt: new Date() } })
     if (!invite) return res.status(404).json({ error: 'Invite not found or expired.' })
     if (action === 'accept') {
-      const room = await GameRoom.findById(invite.room).select('status players')
-      if (!room || room.status !== 'waiting' || room.players.length >= 2 || room.players.some((player) => String(player.user) === req.userId)) {
+      const room = await GameRoom.findById(invite.room).select('status players playerLimit')
+      if (!room || room.status !== 'waiting' || room.players.length >= (room.playerLimit ?? 2) || room.players.some((player) => String(player.user) === req.userId)) {
         return res.status(409).json({ error: 'That room has already started or filled up.' })
       }
     }

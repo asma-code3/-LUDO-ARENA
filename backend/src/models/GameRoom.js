@@ -7,6 +7,7 @@ const gameRoomSchema = new mongoose.Schema({
   status: { type: String, enum: ['waiting', 'playing', 'finished'], default: 'waiting', index: true },
   startedAt: { type: Date, default: null },
   mode: { type: String, enum: ['private', 'online', 'team', 'tournament'], default: 'private' },
+  playerLimit: { type: Number, enum: [2, 3], default: 2 },
   tournament: { type: mongoose.Schema.Types.ObjectId, ref: 'Tournament', default: null, index: true },
   tournamentRound: { type: Number, default: null },
   state: { type: mongoose.Schema.Types.Mixed, default: null },
