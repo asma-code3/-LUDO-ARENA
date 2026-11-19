@@ -1,0 +1,26 @@
+{
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test src/**/*.test.js",
+    "test:online": "node scripts/online-smoke.mjs"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "latest",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.19"
+  },
+  "dependencies": {
+    "framer-motion": "latest",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "socket.io-client": "latest"
+  }
+}
