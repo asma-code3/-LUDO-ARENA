@@ -2,6 +2,14 @@
 
 Ludo Arena deploys as a static Vite client, a Node.js API/Socket.IO service, and MongoDB.
 
+## Render Blueprint
+
+The repository-root `render.yaml` defines a free API web service and a free static frontend. It wires the public API, Socket.IO, and client CORS origins between the two services, generates a private JWT secret, and runs the idempotent seed command before starting the API. The frontend and API build and test workflows run in GitHub Actions; Render deploys after checks pass.
+
+To deploy, push this repository to GitHub, connect the repository to Render, and create a Blueprint from `render.yaml`. Enter the MongoDB Atlas connection string as `MONGODB_URI` when Render requests it. Keep that URI in Render's environment settings; do not commit it to the repository. The generated JWT secret and service URLs are configured by the Blueprint.
+
+The free API service can spin down after inactivity and may take time to wake for the next request. Use it for a preview or hobby deployment; choose a paid always-on service before relying on real-time matches in production. See [Render's free service limits](https://render.com/docs/free).
+
 ## API service
 
 Use Node.js 22.12 or later. Configure these environment variables in the hosting provider:

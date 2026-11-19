@@ -1,4 +1,7 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
+const configuredApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
+const API_BASE = configuredApiUrl.replace(/\/+$/, '').endsWith('/api')
+  ? configuredApiUrl.replace(/\/+$/, '')
+  : `${configuredApiUrl.replace(/\/+$/, '')}/api`
 const TOKEN_KEY = 'ludo-arena-token'
 
 export const authToken = {

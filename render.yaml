@@ -5,7 +5,7 @@ services:
     plan: free
     rootDir: backend
     buildCommand: npm ci
-    startCommand: npm start
+    startCommand: npm run seed && npm start
     healthCheckPath: /api/health
     autoDeployTrigger: checksPass
     envVars:
@@ -18,7 +18,10 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CLIENT_ORIGIN
-        sync: false
+        fromService:
+          type: web
+          name: ludo-arena-frontend
+          envVarKey: RENDER_EXTERNAL_URL
 
   - type: web
     runtime: static
@@ -28,6 +31,12 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
-        sync: false
+        fromService:
+          type: web
+          name: ludo-arena-api
+          envVarKey: RENDER_EXTERNAL_URL
       - key: VITE_SOCKET_URL
-        sync: false
+        fromService:
+          type: web
+          name: ludo-arena-api
+          envVarKey: RENDER_EXTERNAL_URL
