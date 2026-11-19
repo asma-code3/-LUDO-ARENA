@@ -41,12 +41,11 @@ function mergeMessages(current, incoming) {
   return [...merged.values()].sort((left, right) => new Date(left.sentAt) - new Date(right.sentAt)).slice(-50)
 }
 
-function RoomPanel({ onlineMode, teamMode, authenticated, room, error, joinCode, setJoinCode, createRoom, joinRoom, spectateRoom, startGame, userId, matchmaking, searching, cancelMatchmaking, spectator, onSignIn }) {
+function RoomPanel({ onlineMode, authenticated, room, error, joinCode, setJoinCode, createRoom, joinRoom, spectateRoom, startGame, userId, matchmaking, searching, cancelMatchmaking, spectator, onSignIn }) {
   if (!onlineMode) return null
-  if (!authenticated) return <div className="online-room-bar"><div><b>{teamMode ? '2 vs 2 team room' : 'Play online'}</b><small>Sign in to create a real-time room and invite your friends.</small></div><button className="button button-dark" onClick={onSignIn}>Sign in <span>→</span></button></div>
-  if (!room) return <div className="online-room-bar"><div><b>{searching?'Finding a match…':teamMode?'2 vs 2 Team Ludo':'Play online'}</b><small>{searching?teamMode?'Waiting for three other team players.':'Looking for another player in the arena.':teamMode?'Create a team room and invite three other players.':'Create a private room, watch a game, or find a random match.'}</small></div>{searching?<button className="button button-soft" onClick={cancelMatchmaking}>Cancel</button>:<><button className="button button-dark" onClick={matchmaking}>Find {teamMode ? 'team match' : 'match'} <span>↗</span></button><button className="button button-soft" onClick={createRoom}>{teamMode ? 'Create team room' : 'Create room'} <span>＋</span></button><span className="room-or">ROOM CODE</span><input className="room-code-input" value={joinCode} onChange={(event) => setJoinCode(event.target.value.toUpperCase().slice(0, 6))} placeholder="6 CHARACTERS" aria-label="Room code"/><button className="button button-soft" disabled={joinCode.length !== 6} onClick={joinRoom}>Join</button><button className="button button-soft" disabled={joinCode.length !== 6} onClick={spectateRoom}>Watch</button></>}{error && <small className="room-error">{error}</small>}</div>
-  const requiredPlayers = room.mode === 'team' ? 4 : 2
-  return <div className="online-room-bar"><div><b>{spectator?'Watching':room.mode === 'team' ? 'Team room' : 'Room'} #{room.code}</b><small>{room.players.length} / {requiredPlayers} players · {room.status === 'playing' ? 'Game in progress' : room.mode === 'team' ? 'Four players needed for 2 vs 2' : 'Waiting for friends'}</small></div><div className="room-players-mini">{room.players.map((player) => <span key={player.userId}>{player.username}{player.online ? ' · online' : ' · reconnecting'}</span>)}</div>{!spectator && room.status === 'waiting' && room.hostId === userId && <button className="button button-dark" disabled={room.players.length < requiredPlayers} onClick={startGame}>Start game <span>→</span></button>}{error && <small className="room-error">{error}</small>}</div>
+  if (!authenticated) return <div className="online-room-bar"><div><b>Play online · 1 vs 1</b><small>Sign in to create a room, invite a friend, or find a player.</small></div><button className="button button-dark" onClick={onSignIn}>Sign in <span>→</span></button></div>
+  if (!room) return <div className="online-room-bar"><div><b>{searching ? 'Finding a player…' : 'Play online · 1 vs 1'}</b><small>{searching ? 'Waiting for one other player.' : 'Create a private room, watch a game, or find a random player.'}</small></div>{searching ? <button className="button button-soft" onClick={cancelMatchmaking}>Cancel</button> : <><button className="button button-dark" onClick={matchmaking}>Find player <span>↗</span></button><button className="button button-soft" onClick={createRoom}>Create room <span>＋</span></button><span className="room-or">ROOM CODE</span><input className="room-code-input" value={joinCode} onChange={(event) => setJoinCode(event.target.value.toUpperCase().slice(0, 6))} placeholder="6 CHARACTERS" aria-label="Room code"/><button className="button button-soft" disabled={joinCode.length !== 6} onClick={joinRoom}>Join</button><button className="button button-soft" disabled={joinCode.length !== 6} onClick={spectateRoom}>Watch</button></>}{error && <small className="room-error">{error}</small>}</div>
+  return <div className="online-room-bar"><div><b>{spectator ? 'Watching' : 'Room'} #{room.code}</b><small>{room.players.length} / 2 players · {room.status === 'playing' ? 'Game in progress' : 'Waiting for one more player'}</small></div><div className="room-players-mini">{room.players.map((player) => <span key={player.userId}>{player.username}{player.online ? ' · online' : ' · reconnecting'}</span>)}</div>{!spectator && room.status === 'waiting' && room.hostId === userId && <button className="button button-dark" disabled={room.players.length < 2} onClick={startGame}>Start game <span>→</span></button>}{error && <small className="room-error">{error}</small>}</div>
 }
 
 function HomeZone({ player, color, index, turn, legalTokens, onMove }) {
@@ -63,8 +62,8 @@ function ChatPanel({ onlineMode, authenticated, room, messages, value, setValue,
   return <div className="game-chat"><div className="chat-title"><b>Room chat</b><span>● {onlineMode && authenticated ? room ? room.status === 'playing' ? 'Connected' : 'Room ready' : 'Connect to play' : 'Local room'}</span></div><div className="chat-messages">{messages.map((message) => <p key={message.id}><b>{message.player}</b> {message.emoji || message.text}</p>)}{messages.length === 0 && <p className="system-message">{onlineMode && authenticated ? 'Say hello to your room' : 'Local game · chat with your crew'}</p>}</div><div className="chat-reactions">{['👏', '😂', '🔥', '😮', '💚'].map((emoji) => <button key={emoji} onClick={() => onReact(emoji)} aria-label={`React ${emoji}`}>{emoji}</button>)}</div><form className="chat-input" onSubmit={onSend}><input value={value} onChange={(event) => setValue(event.target.value)} placeholder="Say something..." aria-label="Chat message" maxLength={280}/><button aria-label="Send message">↑</button></form></div>
 }
 
-export function GameRoom({ onExit, onSignIn, onProfileUpdate, user, aiMode = false, teamMode = false, onlineMode = false, token = null, userId, initialRoomCode = '', inviteFriendId = '' }) {
-  const [game, setGame] = useState(() => createGame({ playerNames: { coral: user?.username ?? 'Player 1', green: aiMode ? 'Opponent 1' : 'Player 2', gold: aiMode ? 'Opponent 2' : 'Player 3', blue: aiMode ? 'Opponent 3' : 'Player 4' }, teamMode }))
+export function GameRoom({ onExit, onSignIn, onProfileUpdate, user, onlineMode = false, token = null, userId, initialRoomCode = '', inviteFriendId = '' }) {
+  const [game, setGame] = useState(() => createGame({ playerNames: { coral: user?.username ?? 'Player 1', green: 'Player 2' }, playerColors: ['coral', 'green'] }))
   const [rolling, setRolling] = useState(false)
   const [soundsOn, setSoundsOn] = useState(() => localStorage.getItem('ludo-arena-sound') !== 'off')
   const [socket, setSocket] = useState(null)
@@ -149,12 +148,12 @@ export function GameRoom({ onExit, onSignIn, onProfileUpdate, user, aiMode = fal
     })
   }, [isOnline, socket, inviteFriendId, room, initialRoomCode])
 
-  const createRoom = () => socket?.emit('room:create', { mode: teamMode ? 'team' : 'private' }, (result) => result?.ok ? (setSpectator(false), setRoom(result.room), setRoomError('')) : setRoomError(result?.error || 'Could not create a room.'))
+  const createRoom = () => socket?.emit('room:create', { mode: 'private' }, (result) => result?.ok ? (setSpectator(false), setRoom(result.room), setRoomError('')) : setRoomError(result?.error || 'Could not create a room.'))
   const joinRoom = () => socket?.emit('room:join', { code: joinCode }, (result) => result?.ok ? (setSpectator(false), setRoom(result.room), setRoomError('')) : setRoomError(result?.error || 'Could not join that room.'))
   const spectateRoom = () => socket?.emit('room:spectate', { code: joinCode }, (result) => result?.ok ? (setRoom(result.room), setGame(result.game), setSpectator(true), setRoomError('')) : setRoomError(result?.error || 'Could not watch that game.'))
   const startGame = () => socket?.emit('game:start', { code: room?.code }, (result) => { if (!result?.ok) setRoomError(result?.error || 'Could not start the game.') })
   const inviteFriend = (friendId) => socket?.emit('room:invite', { code: room?.code, recipientId: friendId }, (result) => setInviteNotice(result?.ok ? 'Game invite sent.' : result?.error || 'Could not send the invite.'))
-  const findMatch = () => socket?.emit('matchmaking:join', { mode: teamMode ? 'team' : 'online' }, (result) => { if (!result?.ok) setRoomError(result?.error || 'Could not find a match.'); else if (result.waiting) setSearching(true) })
+  const findMatch = () => socket?.emit('matchmaking:join', { mode: 'online' }, (result) => { if (!result?.ok) setRoomError(result?.error || 'Could not find a match.'); else if (result.waiting) setSearching(true) })
   const cancelMatchmaking = () => socket?.emit('matchmaking:leave', () => setSearching(false))
 
   const roll = () => {
@@ -196,37 +195,14 @@ export function GameRoom({ onExit, onSignIn, onProfileUpdate, user, aiMode = fal
     else setMessages((current) => [...current.slice(-19), { id: `${Date.now()}-${Math.random()}`, player: 'Alex', emoji }])
   }
 
-  useEffect(() => {
-    if (!aiMode || turn === 0 || game.status !== 'playing') return undefined
-    const timer = window.setTimeout(() => {
-      if (game.dice === null) playGameSound('dice')
-      setGame((current) => current.dice === null ? rollDice(current) : current)
-    }, 650)
-    return () => window.clearTimeout(timer)
-  }, [aiMode, turn, game.status, game.dice])
-
-  useEffect(() => {
-    if (!aiMode || turn === 0 || game.status !== 'playing' || game.dice === null || !legalTokens.length) return undefined
-    const timer = window.setTimeout(() => {
-      playGameSound('move')
-      setGame((current) => {
-        const options = getLegalTokenIds(current)
-        const choices = options.map((token) => ({ result: moveToken(current, token) }))
-        const score = ({ result }) => (result.lastAction.captured ? 100 : 0) + (result.winner ? 1000 : 0) + result.players[current.currentPlayer].tokens.reduce((sum, progress) => sum + Math.max(0, progress), 0)
-        return choices.sort((a, b) => score(b) - score(a))[0]?.result ?? current
-      })
-    }, 700)
-    return () => window.clearTimeout(timer)
-  }, [aiMode, turn, game.status, game.dice, legalTokens.length])
-
-  const heading = room ? `Room ${room.code}` : aiMode ? 'Practice with AI' : onlineMode ? teamMode ? '2 vs 2 Team Ludo' : 'Online match setup' : teamMode ? 'Local team game' : 'Local game'
+  const heading = room ? `Room ${room.code}` : onlineMode ? 'Online 1 vs 1' : 'Offline 1 vs 1'
   return <div className="game-page">
-    <div className="game-topline"><div><span className="eyebrow">{isOnline ? `REAL-TIME MULTIPLAYER · ${room ? `#${room.code}` : 'ROOM SETUP'}` : aiMode ? 'PRACTICE · AI OPPONENTS' : 'LOCAL GAME ROOM'}</span><h1>{heading}</h1></div><button className="button button-soft" onClick={onExit}>← Back to arena</button></div>
-    <RoomPanel onlineMode={onlineMode} teamMode={teamMode} authenticated={authenticated} room={room} error={roomError} joinCode={joinCode} setJoinCode={setJoinCode} createRoom={createRoom} joinRoom={joinRoom} spectateRoom={spectateRoom} startGame={startGame} userId={userId} matchmaking={findMatch} searching={searching} cancelMatchmaking={cancelMatchmaking} spectator={spectator} onSignIn={onSignIn}/>
+    <div className="game-topline"><div><span className="eyebrow">{isOnline ? `REAL-TIME MULTIPLAYER · ${room ? `#${room.code}` : 'ROOM SETUP'}` : 'LOCAL TWO-PLAYER GAME'}</span><h1>{heading}</h1></div><button className="button button-soft" onClick={onExit}>← Back to arena</button></div>
+    <RoomPanel onlineMode={onlineMode} authenticated={authenticated} room={room} error={roomError} joinCode={joinCode} setJoinCode={setJoinCode} createRoom={createRoom} joinRoom={joinRoom} spectateRoom={spectateRoom} startGame={startGame} userId={userId} matchmaking={findMatch} searching={searching} cancelMatchmaking={cancelMatchmaking} spectator={spectator} onSignIn={onSignIn}/>
     {isOnline && room?.status === 'waiting' && !spectator && <div className="online-room-bar"><div><b>Invite a friend</b><small>Invites expire after two hours and only accepted friends can join.</small></div><div className="room-invite-list">{roomFriends.filter((friend) => !room.players.some((player) => player.userId === friend._id)).map((friend) => <button className="button button-soft" key={friend._id} onClick={() => inviteFriend(friend._id)}>Invite {friend.username}</button>)}{roomFriends.length === 0 && <small>Add friends in your community page to invite them.</small>}</div>{inviteNotice && <small>{inviteNotice}</small>}</div>}
-    <div className="game-layout"><div className="board-column">
-      <div className="game-player-strip">{game.players.map((player, index) => { const mine = index === myPlayerIndex; return <div key={player.color} className={`game-player ${turn === index ? 'active' : ''}`}><span className={`player-piece ${player.color}`}>{player.name[0]}</span><div><b>{player.name}{mine ? ' (You)' : aiMode ? ' (AI)' : ''}</b><small>{turn === index ? mine ? 'Your turn' : 'Playing now' : 'In the game'}</small></div>{turn === index && <i className="turn-live"/>}</div>})}</div>
-      <div className={`ludo-board ${user?.boardTheme ?? 'board-classic'}`}><LayoutGroup id={`ludo-${room?.code ?? (teamMode ? 'local-team' : 'local')}`}>{boardSeats.map(({ color, index, player }) => <HomeZone key={color} player={player} color={color} index={index} turn={turn} legalTokens={legalTokens} onMove={move}/>)}<div className="path-track">
+      <div className="game-layout"><div className="board-column">
+      <div className="game-player-strip">{game.players.map((player, index) => { const mine = index === myPlayerIndex; return <div key={player.color} className={`game-player ${turn === index ? 'active' : ''}`}><span className={`player-piece ${player.color}`}>{player.name[0]}</span><div><b>{player.name}{mine && isOnline ? ' (You)' : ''}</b><small>{turn === index ? mine ? 'Your turn' : 'Playing now' : 'In the game'}</small></div>{turn === index && <i className="turn-live"/>}</div>})}</div>
+      <div className={`ludo-board ${user?.boardTheme ?? 'board-classic'}`}><LayoutGroup id={`ludo-${room?.code ?? 'local'}`}>{boardSeats.map(({ color, index, player }) => <HomeZone key={color} player={player} color={color} index={index} turn={turn} legalTokens={legalTokens} onMove={move}/>)}<div className="path-track">
         {Object.entries(homeLanes).flatMap(([color, lane]) => lane.map(([row, col], index) => {
           const playerIndex = colors.indexOf(color)
           const tokenIndexes = (boardSeats[playerIndex].player?.tokens ?? []).flatMap((progress, tokenIndex) => progress === 51 + index ? [tokenIndex] : [])
@@ -240,10 +216,10 @@ export function GameRoom({ onExit, onSignIn, onProfileUpdate, user, aiMode = fal
       </div></LayoutGroup></div>
       <ChatPanel onlineMode={onlineMode} authenticated={authenticated} room={room} messages={messages} value={chatValue} setValue={setChatValue} onSend={sendMessage} onReact={sendReaction}/>
     </div><aside className="game-control">
-      <div className="game-round"><span className="eyebrow">ROUND {String(game.turnNumber).padStart(2, '0')}</span><b>{game.teamMode ? '2 vs 2 Team Ludo' : 'Classic Ludo'}</b><small>{game.teamMode ? 'Both teammates must bring all tokens home' : 'First to bring all tokens home wins'}</small></div>
-      <div className="turn-card"><div className="turn-card-label">CURRENT TURN</div><div className="turn-player"><span className={`player-piece ${game.players[turn].color}`}>{currentName[0]}</span><div><b>{game.winningTeam ? `${game.winningTeam === 'team-a' ? 'Team A' : 'Team B'} wins!` : game.winner ? `${currentName} wins!` : currentName}</b><small>{turn === myPlayerIndex ? 'That’s you' : aiMode ? 'AI opponent' : game.teamMode && turn % 2 === myPlayerIndex % 2 ? 'Your teammate' : 'Opponent is playing'}</small></div></div></div>
+      <div className="game-round"><span className="eyebrow">ROUND {String(game.turnNumber).padStart(2, '0')}</span><b>Classic 1 vs 1 Ludo</b><small>First player to bring all tokens home wins</small></div>
+      <div className="turn-card"><div className="turn-card-label">CURRENT TURN</div><div className="turn-player"><span className={`player-piece ${game.players[turn].color}`}>{currentName[0]}</span><div><b>{game.winner ? `${currentName} wins!` : currentName}</b><small>{isOnline ? turn === myPlayerIndex ? 'That’s you' : 'Opponent is playing' : `${currentName}'s turn`}</small></div></div></div>
       <div className="dice-area"><button className={`large-die ${user?.diceSkin ?? 'dice-classic'} ${rolling ? 'shake' : ''}`} onClick={roll} aria-label="Roll dice" disabled={spectator || game.dice !== null || (isOnline && room?.status !== 'playing')}><span>{rolling ? '⚄' : game.dice ?? '⚄'}</span></button><small>{spectator?'Spectator mode':game.dice ? 'Choose a highlighted token' : isOnline && room?.status !== 'playing' ? 'Start the room to roll' : 'Tap to roll'}</small></div>
-      <button className="button button-dark full-button" onClick={() => legalTokens.length === 1 ? move(legalTokens[0]) : roll()} disabled={spectator || game.status === 'finished' || (isOnline && room?.status !== 'playing')}>{spectator?'Watching':game.dice && legalTokens.length === 1 ? 'Move token' : game.dice ? 'Choose a token' : `Roll ${turn === myPlayerIndex ? 'your' : 'the'} dice`} <span>→</span></button>
+      <button className="button button-dark full-button" onClick={() => legalTokens.length === 1 ? move(legalTokens[0]) : roll()} disabled={spectator || game.status === 'finished' || (isOnline && room?.status !== 'playing')}>{spectator ? 'Watching' : game.dice && legalTokens.length === 1 ? 'Move token' : game.dice ? 'Choose a token' : isOnline ? `Roll ${turn === myPlayerIndex ? 'your' : 'the'} dice` : `Roll ${currentName}'s dice`} <span>→</span></button>
       <div className="game-control-divider"/><div className="room-tools"><button onClick={() => navigator.clipboard?.writeText(room?.code ?? '')}><span>♧</span> Copy room code <b>＋</b></button><button onClick={() => { const next = !soundsOn; setSoundsOn(next); localStorage.setItem('ludo-arena-sound', next ? 'on' : 'off') }} aria-pressed={soundsOn}><span>◖</span> Sound effects <b className={soundsOn ? 'toggle-on' : ''}>{soundsOn ? 'On' : 'Off'}</b></button><button><span>⚑</span> Report a problem <b>↗</b></button></div><VoiceChat room={room} socket={socket} userId={userId}/><div className="game-note"><span>✦</span><p>Have fun and play fair.<br/><b>Good luck, everyone!</b></p></div>
     </aside></div>
   </div>

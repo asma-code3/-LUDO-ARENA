@@ -11,14 +11,20 @@ export const authToken = {
 }
 
 export async function apiRequest(path, { token = authToken.get(), ...options } = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  })
+  let response
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: {
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+    })
+  } catch (cause) {
+    if (cause instanceof TypeError) throw new Error('Could not reach the Ludo Arena server. Check that the API is running and VITE_API_URL is set correctly.')
+    throw cause
+  }
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(data.error || `Request failed (${response.status}).`)
   return data
